@@ -1,0 +1,181 @@
+package main.java.com.molcon.service;
+
+import java.awt.List;
+import java.io.FileOutputStream;  
+import java.io.OutputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;  
+import org.apache.poi.ss.usermodel.Cell;  
+import org.apache.poi.ss.usermodel.Row;  
+import org.apache.poi.ss.usermodel.Sheet;  
+import org.apache.poi.ss.usermodel.Workbook;  
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+
+public class GenerateExcelAttendace {
+public static void main(String[] args) {
+	 Workbook wb = new HSSFWorkbook(); 
+	 Sheet sheet = wb.createSheet("Sheet"); 
+	try (OutputStream fileOut = new FileOutputStream("Javatpoint.xls")) 
+	{  
+        
+          
+        Row row = sheet.createRow(0);  
+        Cell cell = row.createCell(0);  
+        cell.setCellValue("Attendance Report For 26th March to 25th April 2019");  
+          //Merging cells by providing cell index  
+        sheet.addMergedRegion(new CellRangeAddress(0,0,0,9)); 
+        Row rowOne=sheet.createRow(1);
+        Cell cellOne = rowOne.createCell(0);  
+        cellOne.setCellValue("Sl No"); 
+        sheet.addMergedRegion(new CellRangeAddress(1,2,0,0));
+        Cell cellTwo = rowOne.createCell(1);  
+        cellTwo.setCellValue("ID"); 
+        sheet.addMergedRegion(new CellRangeAddress(1,2,1,1));
+        Cell cellThree = rowOne.createCell(2);  
+        cellThree.setCellValue("NAME"); 
+        sheet.addMergedRegion(new CellRangeAddress(1,2,2,2));
+        Cell cellFour = rowOne.createCell(3);  
+        cellFour.setCellValue("PROJECT"); 
+        sheet.addMergedRegion(new CellRangeAddress(1,2,3,3));
+        String start="26-05-2019";
+        String end="26-06-2019";
+        SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy");
+        Date startDate=format.parse(start);
+        Date endDate=format.parse(end);
+        int i=4;
+        Row rowTwo=sheet.createRow(2);
+        while(startDate.before(endDate))
+        {
+        	 SimpleDateFormat formatOne=new SimpleDateFormat("dd-MMM");
+             String dateOne=formatOne.format(startDate);             
+             Cell cellValue = rowOne.createCell(i);  
+             cellValue.setCellValue(dateOne); 
+             sheet.addMergedRegion(new CellRangeAddress(1,1,i,i));
+             Calendar c = Calendar.getInstance();
+             Calendar cal = Calendar.getInstance();
+             cal.setTime(startDate);
+             cal.add(cal.DATE, 1);
+             DateFormat format2=new SimpleDateFormat("EEE"); 
+             String finalDay=format2.format(startDate);
+             Cell cellFive = rowTwo.createCell(i);  
+             cellFive.setCellValue(finalDay); 
+             sheet.addMergedRegion(new CellRangeAddress(2,2,i,i));
+             startDate=cal.getTime();
+            i++;
+        }
+      StringBuilder sb= getTheConsultantIdFromAttendance();
+     JSONArray jsonArray=  getFiveDaysWorkEmployeeDetails(sb);
+     JSONArray jsonEmp= getSixDaysWorkEmployeeDetails(sb);
+        wb.write(fileOut);  
+        
+        
+    }catch(Exception e) {  
+        System.out.println(e.getMessage());  
+    }  
+}
+
+private static JSONArray getSixDaysWorkEmployeeDetails(StringBuilder sb) {
+	// TODO Auto-generated method stub
+	JSONArray jsonArrayDetails=new JSONArray();
+	Connection con=null;
+	 PreparedStatement preparedStatement=null;
+	 ResultSet rs=null;
+	 String compiledQuery = "select * from attendance.offsitemployee where emp_id in("+sb+")and project_name in(Select project_name from attendance.projectdetails);";	 	
+	try {
+		Class.forName("com.mysql.jdbc.Driver");
+		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
+		preparedStatement = con.prepareStatement(compiledQuery);
+		rs=preparedStatement.executeQuery();
+		while(rs.next())
+		{
+			JSONObject jsonObject=new JSONObject();
+			jsonObject.put("emp_id",rs.getString("emp_id"));
+			jsonObject.put("name",rs.getString("name"));
+			jsonObject.put("project",rs.getString("project_name"));
+			jsonArrayDetails.put(jsonObject);
+		}
+	}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+	return jsonArrayDetails;
+}
+
+private static JSONArray getFiveDaysWorkEmployeeDetails(StringBuilder sb) {
+	// TODO Auto-generated method stub
+	Connection con=null;
+	 PreparedStatement preparedStatement=null;
+	 ResultSet rs=null;
+	 JSONArray jsonArray=new JSONArray();
+	 String compiledQuery = "select * from attendance.offsitemployee where emp_id in("+sb+")and project_name not in(Select project_name from attendance.projectdetails);";	 	
+	try {
+		Class.forName("com.mysql.jdbc.Driver");
+		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
+		preparedStatement = con.prepareStatement(compiledQuery);
+		rs=preparedStatement.executeQuery();
+		while(rs.next())
+		{
+			JSONObject jsonObject=new JSONObject();
+			jsonObject.put("emp_id",rs.getString("emp_id"));
+			jsonObject.put("name",rs.getString("name"));
+			jsonObject.put("project",rs.getString("project_name"));
+			jsonArray.put(jsonObject);
+			
+		}
+	}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+	return jsonArray;
+}
+
+private static StringBuilder getTheConsultantIdFromAttendance() {
+	// TODO Auto-generated method stub
+	StringBuilder sb=new StringBuilder();	
+     Connection con=null;
+	 PreparedStatement preparedStatement=null;
+	 ResultSet rs=null;
+	 String compiledQuery = "select distinct(emp_code) from attendance.employeetime where emp_code like'INT%'";	 	
+	try {
+		Class.forName("com.mysql.jdbc.Driver");
+		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
+		preparedStatement = con.prepareStatement(compiledQuery);
+		rs=preparedStatement.executeQuery();
+		while(rs.next())
+		{
+			String employeeId=rs.getString(1);
+			Pattern p = Pattern.compile("\\d+");
+			Matcher m = p.matcher(employeeId);
+			String number = null;
+			if(m.find()) {
+	            
+	             number=m.group();
+	        }			
+			sb.append("'"+"INT "+number+"'");
+			sb.append(",");			
+		}
+		sb.deleteCharAt(sb.length()-1);
+	}
+	catch(Exception e)
+	{
+		e.printStackTrace();
+	}
+	return sb;
+}
+}
+  
