@@ -1,37 +1,29 @@
-package main.java.com.molcon.service;
+package com.molcon.service;
 
-import java.awt.List;
-import java.io.FileOutputStream;  
+import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;  
-import org.apache.poi.ss.usermodel.Cell;  
-import org.apache.poi.ss.usermodel.Row;  
-import org.apache.poi.ss.usermodel.Sheet;  
-import org.apache.poi.ss.usermodel.Workbook;  
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-
-public class GenerateExcelAttendace {
+public class GenerateExcelAttendance {
 public static void main(String[] args) {
 	 Workbook wb = new HSSFWorkbook(); 
 	 Sheet sheet = wb.createSheet("Sheet"); 
-	try (OutputStream fileOut = new FileOutputStream("Javatpoint.xls")) 
+	 GetConsultantDetails consultant=new GetConsultantDetails();
+	try (OutputStream fileOut = new FileOutputStream("Consultant 26th March 2019 to 25th April 2019.xls")) 
 	{  
-        
-          
         Row row = sheet.createRow(0);  
         Cell cell = row.createCell(0);  
         cell.setCellValue("Attendance Report For 26th March to 25th April 2019");  
@@ -64,7 +56,6 @@ public static void main(String[] args) {
              Cell cellValue = rowOne.createCell(i);  
              cellValue.setCellValue(dateOne); 
              sheet.addMergedRegion(new CellRangeAddress(1,1,i,i));
-             Calendar c = Calendar.getInstance();
              Calendar cal = Calendar.getInstance();
              cal.setTime(startDate);
              cal.add(cal.DATE, 1);
@@ -76,9 +67,14 @@ public static void main(String[] args) {
              startDate=cal.getTime();
             i++;
         }
-      StringBuilder sb= getTheConsultantIdFromAttendance();
-     JSONArray jsonArray=  getFiveDaysWorkEmployeeDetails(sb);
-     JSONArray jsonEmp= getSixDaysWorkEmployeeDetails(sb);
+      StringBuilder sb= consultant.getTheConsultantIdFromAttendance();
+     JSONArray jsonArray=  consultant.getFiveDaysWorkEmployeeDetails(sb);
+     JSONArray jsonEmp= consultant.getSixDaysWorkEmployeeDetails(sb);
+     int count=writeFiveDaysEmployeeDetailsIntoExcel(sheet,jsonArray,start,end);
+     writeSixDaysEmployeeDetailsIntoEXcel(sheet,jsonEmp,count,start,end);
+     
+     
+    
         wb.write(fileOut);  
         
         
@@ -87,95 +83,91 @@ public static void main(String[] args) {
     }  
 }
 
-private static JSONArray getSixDaysWorkEmployeeDetails(StringBuilder sb) {
+private static void writeSixDaysEmployeeDetailsIntoEXcel(Sheet sheet,
+		JSONArray jsonEmp,int count,String start,String end) {
 	// TODO Auto-generated method stub
-	JSONArray jsonArrayDetails=new JSONArray();
-	Connection con=null;
-	 PreparedStatement preparedStatement=null;
-	 ResultSet rs=null;
-	 String compiledQuery = "select * from attendance.offsitemployee where emp_id in("+sb+")and project_name in(Select project_name from attendance.projectdetails);";	 	
-	try {
-		Class.forName("com.mysql.jdbc.Driver");
-		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
-		preparedStatement = con.prepareStatement(compiledQuery);
-		rs=preparedStatement.executeQuery();
-		while(rs.next())
-		{
-			JSONObject jsonObject=new JSONObject();
-			jsonObject.put("emp_id",rs.getString("emp_id"));
-			jsonObject.put("name",rs.getString("name"));
-			jsonObject.put("project",rs.getString("project_name"));
-			jsonArrayDetails.put(jsonObject);
-		}
-	}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
-	return jsonArrayDetails;
-}
-
-private static JSONArray getFiveDaysWorkEmployeeDetails(StringBuilder sb) {
-	// TODO Auto-generated method stub
-	Connection con=null;
-	 PreparedStatement preparedStatement=null;
-	 ResultSet rs=null;
-	 JSONArray jsonArray=new JSONArray();
-	 String compiledQuery = "select * from attendance.offsitemployee where emp_id in("+sb+")and project_name not in(Select project_name from attendance.projectdetails);";	 	
-	try {
-		Class.forName("com.mysql.jdbc.Driver");
-		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
-		preparedStatement = con.prepareStatement(compiledQuery);
-		rs=preparedStatement.executeQuery();
-		while(rs.next())
-		{
-			JSONObject jsonObject=new JSONObject();
-			jsonObject.put("emp_id",rs.getString("emp_id"));
-			jsonObject.put("name",rs.getString("name"));
-			jsonObject.put("project",rs.getString("project_name"));
-			jsonArray.put(jsonObject);
-			
-		}
-	}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
-	return jsonArray;
-}
-
-private static StringBuilder getTheConsultantIdFromAttendance() {
-	// TODO Auto-generated method stub
-	StringBuilder sb=new StringBuilder();	
-     Connection con=null;
-	 PreparedStatement preparedStatement=null;
-	 ResultSet rs=null;
-	 String compiledQuery = "select distinct(emp_code) from attendance.employeetime where emp_code like'INT%'";	 	
-	try {
-		Class.forName("com.mysql.jdbc.Driver");
-		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
-		preparedStatement = con.prepareStatement(compiledQuery);
-		rs=preparedStatement.executeQuery();
-		while(rs.next())
-		{
-			String employeeId=rs.getString(1);
-			Pattern p = Pattern.compile("\\d+");
-			Matcher m = p.matcher(employeeId);
-			String number = null;
-			if(m.find()) {
-	            
-	             number=m.group();
-	        }			
-			sb.append("'"+"INT "+number+"'");
-			sb.append(",");			
-		}
-		sb.deleteCharAt(sb.length()-1);
-	}
-	catch(Exception e)
-	{
+	int rowCount=count+2;
+	 SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy");
+	  SimpleDateFormat formatOne=new SimpleDateFormat("yyyy-MM-dd");
+        try {
+        	for(int i=0;i<jsonEmp.length();i++)
+        	{
+        		int cellCount=0;
+        		JSONObject object=jsonEmp.getJSONObject(i);
+        		String empId=object.getString("emp_id");
+        		String name=object.getString("name");
+        		String project=object.getString("project");
+        		Row row = sheet.createRow(rowCount++);  
+                Cell cell = row.createCell(cellCount++);
+                cell.setCellValue(count++);
+                Cell cellOne = row.createCell(cellCount++);
+                cellOne.setCellValue(empId);
+                Cell cellTwo = row.createCell(cellCount++);
+                cellTwo.setCellValue(name);
+                Cell cellThree = row.createCell(cellCount++);
+                cellThree.setCellValue(project);
+                Date startDate=format.parse(start);
+			    Date endDate=format.parse(end);
+		} 
+	}catch (ParseException e) {
+		// TODO Auto-generated catch block
 		e.printStackTrace();
 	}
-	return sb;
+	
+	
 }
+
+private static int writeFiveDaysEmployeeDetailsIntoExcel(Sheet sheet,
+		JSONArray jsonArray,String start,String end) {
+	
+	// TODO Auto-generated method stub
+	int rowCount=3;
+	int j=1;
+	 SimpleDateFormat format=new SimpleDateFormat("dd-MM-yyyy");
+	 SimpleDateFormat formatOne=new SimpleDateFormat("yyyy-MM-dd");
+	 try{
+	for(int i=0;i<jsonArray.length();i++)
+	{
+		int cellCount=0;
+		JSONObject object=jsonArray.getJSONObject(i);
+		String empId=object.getString("emp_id");
+		String name=object.getString("name");
+		String project=object.getString("project");
+		Row row = sheet.createRow(rowCount++);  
+        Cell cell = row.createCell(cellCount++);
+        cell.setCellValue(j++);
+        Cell cellOne = row.createCell(cellCount++);
+        cellOne.setCellValue(empId);
+        Cell cellTwo = row.createCell(cellCount++);
+        cellTwo.setCellValue(name);
+        Cell cellThree = row.createCell(cellCount++);
+        cellThree.setCellValue(project);
+        Date from=format.parse(start);
+        String d=formatOne.format(from);
+        Date startDate = new SimpleDateFormat("yyyy-MM-dd").parse(d);
+        System.out.println(startDate);
+	    Date to=format.parse(end);
+	    String DateTwo=formatOne.format(to);
+	  
+	  System.out.println(d+" "+startDate);
+	  Date endDate = null;
+	    while(startDate.before(endDate))
+        {
+        
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(startDate);
+        cal.add(cal.DATE, 1);
+        startDate=cal.getTime();
+        }
+	}
+	 }
+	 catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}catch (Exception e) {
+			// TODO: handle exception
+		}
+	return j;
 }
-  
+
+}
