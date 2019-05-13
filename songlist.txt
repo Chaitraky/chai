@@ -1,197 +1,160 @@
-package main.java.com.molcon.service;
+package com.molcon.service;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public class ReadAttendanceFiles {
-public static void main(String[] args) {
-	JSONArray jsonArray=getAttendanceDetails();
-		saveAttendanceDetails(jsonArray);
-		HashMap map=getStartAndEndDate(jsonArray);
-		saveStartAndEndTime(map);
-		/*Iterator iter = map.entrySet().iterator();
-		while (iter.hasNext()) {
-			Map.Entry entry = (Map.Entry) iter.next();
-			System.out.println("[Key] : " + entry.getKey() + " [Value] : " + entry.getValue());
-		}*/
-}
+import com.molcon.utility.AppProperty;
 
-private static void saveStartAndEndTime(HashMap map) {
-	// TODO Auto-generated method stub
-	 Connection con=null;
-	 PreparedStatement preparedStatement=null;
-	 String compiledQuery = "INSERT INTO attendance.employeeTime(emp_code, date, start_time, end_time)" +
-            " VALUES" + "(?, ?, ?, ?)";	 	
-	Iterator iter = map.entrySet().iterator();
-	try {
-		Class.forName("com.mysql.jdbc.Driver");
-		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
-		preparedStatement = con.prepareStatement(compiledQuery);
-	while (iter.hasNext()) {
-		Map.Entry entry = (Map.Entry) iter.next();
-	JSONObject jsonObject= (JSONObject) entry.getValue();	
-	
+public class GetConsultantDetails {
+	static String driver = AppProperty.getProperty("mysql.jdbc.driver");
+	static String url = AppProperty.getProperty("mysql.jdbc.url");
+	static String userName = AppProperty.getProperty("mysql.jdbc.username");
+	static String password = AppProperty.getProperty("mysql.jdbc.password");
+	static HashMap map=new HashMap();
+	public StringBuilder getTheConsultantIdFromAttendance() {
+		// TODO Auto-generated method stub
 		
-		preparedStatement.setString(1,jsonObject.getString("empId"));
-		String date= jsonObject.getString("date");
-		Date dateOne=new SimpleDateFormat("yyyy-MM-dd").parse(date);
-		java.sql.Date dateTwo=new java.sql.Date(dateOne.getTime());
-		preparedStatement.setDate(2, dateTwo);
-		preparedStatement.setString(3, jsonObject.getString("startTime"));
-		preparedStatement.setString(4, jsonObject.getString("endTime"));
-		preparedStatement.addBatch();
-	}
-	preparedStatement.executeBatch();
-	} catch (ClassNotFoundException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (SQLException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (ParseException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
-	
-	}
-
-private static HashMap getStartAndEndDate(JSONArray jsonArray) {
-	// TODO Auto-generated method stub
-	HashMap map=new HashMap();
-	SimpleDateFormat sdf=new SimpleDateFormat("HH:mm:ss");
-	try {
-	for(int i=0;i<jsonArray.length();i++)
-	{
-		JSONObject json=new JSONObject();
-		JSONObject jsonObject=jsonArray.getJSONObject(i);
-		String empId=jsonObject.getString("empId");
-		String date=jsonObject.getString("date");
-		String startTime=jsonObject.getString("time");
-		String endTime=jsonObject.getString("time");
-		if(map.containsKey(empId))
-		{
-			JSONObject object= (JSONObject) map.get(empId);
-			String start=object.getString("startTime");
-			String end=object.getString("endTime");
-			Date startDateOne=sdf.parse(start);
-			Date startDateTwo=sdf.parse(startTime);
-			Date endDateOne=sdf.parse(end);
-			Date endDateTwo=sdf.parse(endTime);
-			if(startDateTwo.getTime()>startDateOne.getTime())
+		StringBuilder sb=new StringBuilder();	
+	     Connection con=null;
+		 PreparedStatement preparedStatement=null;
+		 ResultSet rs=null;
+		 String compiledQuery = "select distinct(emp_code) from employeetime where emp_code like'INT%'";	 	
+		try {
+			Class.forName(driver);
+			con=DriverManager.getConnection(url,userName,password);
+			preparedStatement = con.prepareStatement(compiledQuery);
+			rs=preparedStatement.executeQuery();
+			while(rs.next())
 			{
-				startTime=start;
+				String employeeId=rs.getString(1);
+				Pattern p = Pattern.compile("\\d+");
+				Matcher m = p.matcher(employeeId);
+				String number = null;
+				if(m.find()) {
+		            
+		             number=m.group();
+		        }			
+				sb.append("'"+"INT "+number+"'");
+				sb.append(",");			
 			}
-			if(endDateTwo.getTime()<endDateOne.getTime())
-			{
-				endTime=end;
-			}			
-			map.remove(empId);
-			json.put("empId", empId);
-			json.put("date", date);
-			json.put("startTime", startTime);
-			json.put("endTime", endTime);
-			map.put(empId, json);
-			
+			sb.deleteCharAt(sb.length()-1);
 		}
-		else
+		catch(Exception e)
 		{
-			json.put("empId", empId);
-			json.put("date", date);
-			json.put("startTime", startTime);
-			json.put("endTime", endTime);
-			map.put(empId, json);			
+			e.printStackTrace();
+		}
+		finally{
+			try {
+				con.close();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		return sb;
+	}
+	public JSONArray getFiveDaysWorkEmployeeDetails(StringBuilder sb) {
+		// TODO Auto-generated method stub
+		Connection con=null;
+		 PreparedStatement preparedStatement=null;
+		 ResultSet rs=null;
+		 JSONArray jsonArray=new JSONArray();
+		String compiledQuery = "select * from dss.offsite_employees where emp_id in("+sb+")and project_name not in(Select project_name from project_details)";	 	
+		String queryOne="select * from dss.offsite_employees where emp_id in(select emp_id FROM fiveday_employees)";
+		try {
+			Class.forName(driver);
+			con=DriverManager.getConnection(url,userName,password);
+			preparedStatement = con.prepareStatement(compiledQuery);
+			rs=preparedStatement.executeQuery();
+			while(rs.next())
+			{
+				JSONObject jsonObject=new JSONObject();
+				jsonObject.put("emp_id",rs.getString("emp_id"));
+				jsonObject.put("name",rs.getString("name"));
+				jsonObject.put("project",rs.getString("project_name"));
+				jsonArray.put(jsonObject);
+				
+			}
+		}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
+		finally{
+			try {
+				preparedStatement.close();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		try {
+			preparedStatement = con.prepareStatement(queryOne);
+			rs=preparedStatement.executeQuery();
+			while(rs.next())
+			{
+				JSONObject jsonObject=new JSONObject();
+				String emp_id=rs.getString("emp_id");
+				map.put(emp_id, emp_id);
+				jsonObject.put("emp_id",emp_id);
+				jsonObject.put("name",rs.getString("name"));
+				jsonObject.put("project",rs.getString("project_name"));
+				jsonArray.put(jsonObject);
+				
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally{
+			try {
+				con.close();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		
-	}
-	} catch (ParseException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}
-	
-	return map;
-}
 
-private static void saveAttendanceDetails(JSONArray jsonArray) {
-	// TODO Auto-generated method stub
-	Connection con=null;
-	 PreparedStatement preparedStatement=null;
-	 String compiledQuery = "INSERT INTO attendance.employeedetails(emp_code, date, time, type)" +
-             " VALUES" + "(?, ?, ?, ?)";	 	
-	try {
-		Class.forName("com.mysql.jdbc.Driver");
-		con=DriverManager.getConnection("Jdbc:mysql://localhost:3306?user=root&password=dinga");
-		preparedStatement = con.prepareStatement(compiledQuery);
-		for(int i=0;i<jsonArray.length();i++)
-		{
-			JSONObject jsonObject=jsonArray.getJSONObject(i);
-			preparedStatement.setString(1,jsonObject.getString("empId"));
-			String date= jsonObject.getString("date");
-			Date dateOne=new SimpleDateFormat("yyyy-MM-dd").parse(date);
-			java.sql.Date dateTwo=new java.sql.Date(dateOne.getTime());
-			preparedStatement.setDate(2, dateTwo);
-			preparedStatement.setString(3, jsonObject.getString("time"));
-			preparedStatement.setString(4, jsonObject.getString("type"));
-			preparedStatement.addBatch();			
+		return jsonArray;
+			}
+	public JSONArray getSixDaysWorkEmployeeDetails(StringBuilder sb) {
+		// TODO Auto-generated method stub	
+		JSONArray jsonArrayDetails=new JSONArray();
+		Connection con=null;
+		 PreparedStatement preparedStatement=null;
+		 ResultSet rs=null;
+		 String compiledQuery = "select * from dss.offsite_employees where emp_id in("+sb+")and project_name in(Select project_name from project_details);";	 	
+		try {
+			Class.forName(driver);
+			con=DriverManager.getConnection(url,userName,password);
+			preparedStatement = con.prepareStatement(compiledQuery);
+			rs=preparedStatement.executeQuery();
+			while(rs.next())
+			{
+				JSONObject jsonObject=new JSONObject();
+				if(!(map.containsKey(rs.getString("emp_id"))))
+				{
+				jsonObject.put("emp_id",rs.getString("emp_id"));
+				jsonObject.put("name",rs.getString("name"));
+				jsonObject.put("project",rs.getString("project_name"));
+				jsonArrayDetails.put(jsonObject);
+				}
+			}
 		}
-		preparedStatement.executeBatch();
-		 
-	} catch (SQLException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (ClassNotFoundException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (ParseException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	}	
-}
-
-private static JSONArray  getAttendanceDetails() {
-	// TODO Auto-generated method stub
-	FileInputStream fstream;
-	 JSONArray jsonArray=new JSONArray();
-	try {
-		fstream = new FileInputStream("C:/Users/Chinni/Downloads/Attendance/11-05-2019.txt");
-		 DataInputStream in = new DataInputStream(fstream);
-		    BufferedReader br = new BufferedReader(new InputStreamReader(in));
-		    String strLine;
-		   
-	          while ((strLine = br.readLine()) != null)   {
-	        String[] tokens = strLine.split("	");
-	        JSONObject jsonObject=new JSONObject();
-	        jsonObject.put("empId", tokens[0]);
-	        jsonObject.put("date", tokens[1]);
-	        jsonObject.put("time", tokens[2]);
-	        jsonObject.put("type", tokens[3]);
-	        jsonArray.put(jsonObject); 	         
-	          }
-	        
-	} catch (FileNotFoundException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
-	} catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
+			catch(Exception e)
+			{
+				e.printStackTrace();
+			}
+		return jsonArrayDetails;
 	}
-   
-	return jsonArray; 	
-}
+
 }
